@@ -6,6 +6,22 @@ import matplotlib.pyplot as plt
 # ALCDEF data standard is described at http://alcdef.org/docs/ALCDEF_Standard.pdf
 
 def read_alcdef(filename, datadir='.'):
+    """Read the ALCDEF data file.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the ALCDEF data file (one per asteroid).
+    datadir : str, opt
+        The directory containing filename. Default '.'.
+
+    Returns
+    -------
+    list of dicts, list of pandas.DataFrames
+        Each lightcurve block is kept as a separate item in the lists.
+        The list of dicts contains the metadata about each block.
+        The list of dataframes contains the data from the observations in each block.
+    """
     with open(os.path.join(datadir, filename)) as f:
         data = list(f)
     len(data)
@@ -54,9 +70,22 @@ def read_alcdef(filename, datadir='.'):
     for i in range(nblocks):
         lc[i] = pd.DataFrame(lc[i], columns=['JD', 'Mag', 'DeltaMag', 'Airmass'])
     return metadata, lc
-    
+
 
 def plot_lightcurve(metadata, lc, filename):
+    """Plot the lightcurve blocks.
+
+    Parameters
+    ----------
+    metadata : list of dicts
+        The metadata about each block. The metadata is expected to follow the ALCDEF standard.
+    lc : list of pd.DataFrames
+        The observations in each block.
+    filename : str
+        The name of the input filename. This is used to label the plot and metadata written to stdout.
+
+    Generates one plot for each block, and one plot containing all blocks.
+    """
     colors = ['g', 'r', 'b', 'y']
     for i in range(len(metadata)):
         plt.figure(figsize=(12, 10))
