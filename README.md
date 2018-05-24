@@ -1,4 +1,2 @@
-# translate-cuss
-A collection of code to translate various available data products into CUSS
-
-TODO: decide what "into CUSS" means (for now, it's get it into python -- tbd, format)
+### Solar System Catalog Data Products Utilities (SSDPU)
+A collection of utilities to read various solar system data products and eventually do some things with them.
