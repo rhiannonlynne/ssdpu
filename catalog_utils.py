@@ -1,12 +1,47 @@
 import numpy as np
 import pandas as pd
 
-__all__ = ['read_sdss_moc', 'read_astorb', 'read_lcdb']
+__all__ = ['read_mpcorb', 'read_sdss_moc', 'read_astorb', 'read_lcdb']
 
 def _convert_designation(x):
     # Match astorb designation to MOC designation.
     x.designation = str(x.designation).rstrip(' ').lstrip(' ').replace(' ', '_')
     return x
+
+def read_mpcorb(filename='MPCORB.DAT', header=False):
+    """Read Minor Planet Center Orbit Database
+    
+    File contains published orbital elements for all numbered and unnumbered 
+    multi-opposition minor planets.
+    Get the file at:
+    https://www.minorplanetcenter.net/iau/MPCORB.html    
+    See documentation at:
+    https://minorplanetcenter.net/iau/info/MPOrbitFormat.html
+    
+    Parameters
+    ----------
+    filename : str, opt
+        The full path to the MPCORB catalog file.
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+    if header:
+        skiprows = 40
+    else:
+        skiprows = 0
+    names = ['#Des', 'H', 'G', 'Epoch', 'M', 'Peri', 
+             'Node', 'Incl.', 'e', 'n','a', '0','Reference', 
+             '#Obs', '#Opp', 'Yr of 1st & last Obs','r.m.s', 
+             'Coarse indic of Perts', 'Precise indic of Perts', 'Computer', 
+             '?', '#','Readable Des','Last Obs']
+    colspecs = [(0,7),(8,13),(14,19),(20,25),(26,35),(37,46),
+                (48,57),(59,68),(70,79),(80,91),(92,103),(108,116),
+                (117,122),(123,126),(127,136),(137,141), 
+                (142, 145),(146,149),(150,160),(166,194),(194,202)]
+    mpc = pd.read_fwf(filename, names=names, usecols=names, index=False)
+    return mpc
 
 
 def read_sdss_moc(filename='ADR4.dat'):
