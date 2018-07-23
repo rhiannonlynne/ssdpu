@@ -27,14 +27,14 @@ def read_mpcorb(filename='MPCORB.DAT', header=False):
     pandas.DataFrame
     """
     if header:
-        skiprows = 40
+        skiprows = 43
     else:
         skiprows = 0
-    names = ['mpcId', 'H', 'G', 'epoch', 'meanAnom', 'argPeri', 
-             'lonNode', 'inc', 'e', 'meanDailymo','a', '0','reference', 
+    names = ['mpcId', 'H', 'G', 'epoch', 'meanAnomaly', 'argPeri', 
+             'Omega', 'inc', 'e', 'meanDailymo','a', 'reference', 
              '#Obs', '#Opp', 'yr_1st&last_Obs','r.m.s', 
              'coarsePerts', 'precisePerts', 'computer', 
-             '?', '#','name','lastObs']
+              '#','name','lastObs']
     colspecs = [(0,7),(8,13),(14,19),(20,25),(26,35),(37,46),
                 (48,57),(59,68),(70,79),(80,91),(92,103),(108,116),
                 (117,122),(123,126),(127,136),(137,141), 
@@ -69,8 +69,8 @@ def read_sdss_moc(filename='ADR4.dat'):
            'sdssa', 'aerr', 'V', 'B', 'idFlag', 'numberId', 'name',
            'detectionCount', 'totalCount', 'sdss_flags',
            'calcRA', 'calcDec', 'calcAppMag', 'helioDistance', 'geoDistance', 'phase',
-           'catalogId', 'H', 'G1', 'obsArc', 'epoch', 'a', 'e', 'inc', 'lonNode', 'argPeri', 
-           'meanAnom','elemCatalogId', 'aProper', 'eProper', 'siniProper' ]
+           'catalogId', 'H', 'G1', 'obsArc', 'epoch', 'a', 'e', 'inc', 'Omega', 'argPeri', 
+           'meanAnomaly','elemCatalogId', 'aProper', 'eProper', 'siniProper' ]
     # a* color = 0.89 (g - r) + 0.45 (r - i) - 0.57
     moc = pd.read_table(filename, delim_whitespace=True, names=names, usecols=names)
     return moc
@@ -95,7 +95,7 @@ def read_astorb(filename='astorb.dat'):
     names=['#', 'name', 'computer', 'H', 'G1', 'B-V',
            'diameter_IRAS_km', 'classification_IRAS',
            'planet_crossing', 'orbit_comp', 'survey', 'mpc_crit', 'lowell_obs', 'rank',
-           'obsArc', '#Obs', 'epoch', 'meanAnom', 'argPeri', 'lonNode', 'inc', 'e', 'a',
+           'obsArc', '#Obs', 'epoch', 'meanAnomaly', 'argPeri', 'Omega', 'inc', 'e', 'a',
            'date_comp', 'ceu', 'deltaceu', 'ceudate',
            'peumax', 'peumaxdate', 'peumax10', 'peumax10date', 'peumax2', 'peumax2date']
     widths = [7, 19, 16, 6, 6, 5, 6, 5, 4, 4, 4, 4, 4, 4, 6, 6, 9, 11, 11, 11, 10, 11, 13,
