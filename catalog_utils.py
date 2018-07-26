@@ -40,6 +40,7 @@ def read_mpcorb(filename='MPCORB.DAT', header=False):
                 (117,122),(123,126),(127,136),(137,141), 
                 (142, 145),(146,149),(150,160),(166,194),(194,202)]
     mpc = pd.read_fwf(filename, names=names, usecols=names, index=False)
+    mpc = mpc.apply(_convert_designation, axis=1)
     return mpc
 
 
