@@ -8,9 +8,8 @@ def _convert_designation(x):
     x.name = str(x.name).rstrip(' ').lstrip(' ').replace(' ', '_')
     return x
 
-def read_mpcorb(filename='MPCORB.DAT', header=False):
+def read_mpcorb(filename='MPCORB.DAT', header=True):
     """Read Minor Planet Center Orbit Database
-    
     File contains published orbital elements for all numbered and unnumbered 
     multi-opposition minor planets.
     Get the file at:
@@ -31,15 +30,15 @@ def read_mpcorb(filename='MPCORB.DAT', header=False):
     else:
         skiprows = 0
     names = ['mpcId', 'H', 'G', 'epoch', 'meanAnomaly', 'argPeri', 
-             'Omega', 'inc', 'e', 'meanDailymo','a', 'reference', 
+             'Omega', 'inc', 'e', 'meanDailymo','a','reference', 
              '#Obs', '#Opp', 'yr_1st&last_Obs','r.m.s', 
              'coarsePerts', 'precisePerts', 'computer', 
-              '#','name','lastObs']
+              'name','lastObs']
     colspecs = [(0,7),(8,13),(14,19),(20,25),(26,35),(37,46),
                 (48,57),(59,68),(70,79),(80,91),(92,103),(108,116),
                 (117,122),(123,126),(127,136),(137,141), 
                 (142, 145),(146,149),(150,160),(166,194),(194,202)]
-    mpc = pd.read_fwf(filename, names=names, usecols=names, index=False)
+    mpc = pd.read_fwf(filename, names=names, skiprows=skiprows, colspecs=colspecs, index=False)
     mpc = mpc.apply(_convert_designation, axis=1)
     return mpc
 
