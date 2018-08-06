@@ -60,7 +60,7 @@ def _parse_name(s):
         namedict.setdefault('desig', 'NULL')
         desig = namedict['desig']
         namedict.setdefault('name', desig)
-    except TargetNameParseError or AttributeError:
+    except (TargetNameParseError, AttributeError) as e:
         print(s)
         namedict = None
     return namedict
