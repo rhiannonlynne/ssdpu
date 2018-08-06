@@ -1,26 +1,88 @@
 import numpy as np
 import pandas as pd
+from sbpy.data import Names, TargetNameParseError
 
 __all__ = ['read_mpcorb', 'read_sdss_moc', 'read_astorb', 'read_lcdb']
 
-def _convert_designation(x):
-    # Match astorb designation to MOC designation.
-    x.name = str(x.name).rstrip(' ').lstrip(' ').replace(' ', '_')
+
+def _expand_name(sname):
+    try:
+        int(sname)
+    except ValueError:
+        if sname.startswith('C') or sname.startswith('P'):
+            sname = sname[0:6] + '_' + sname[6:]
+        else:
+            year = sname[0:4]
+            letters = sname[4:6]
+            numbers = int(sname[6:])
+            if numbers > 0:
+                sname = '%s_%s%d' % (year, letters, numbers)
+            else:
+                sname = '%s_%s' % (year, letters)
+    return sname
+
+
+def _parse_mpc_names(x):
+    namedict = _parse_name(x.readableName)
+    if namedict is None:
+        x.numberId = x.mpcId
+        x.Name = x.readableName
+        x.Desig = x.readableName
+    else:
+        x.numberId = namedict['number']
+        x.Name = namedict['name']
+        x.Desig = namedict['desig']
     return x
+
+
+def _parse_astorb_names(x):
+    namedict = _parse_name(x.Name)
+    if namedict is None:
+        x.Desig = x.Name
+    else:
+        x.Desig = namedict['desig']
+    return x
+
+
+def _parse_sdss_names(x):
+    x.Name = x.Name.replace('_', ' ')
+    namedict = Names._parse_name(x.Name)
+    if namedict is None:
+        x.Desig = x.Name
+    else:
+        x.Desig = namedict['desig']
+    return x
+
+def _parse_name(s):
+    try:
+        namedict = Names.parse_asteroid(s)
+        namedict.setdefault('number', -999)
+        namedict.setdefault('desig', 'NULL')
+        desig = namedict['desig']
+        namedict.setdefault('name', desig)
+    except TargetNameParseError or AttributeError:
+        print(s)
+        namedict = None
+    return namedict
+
 
 def read_mpcorb(filename='MPCORB.DAT', header=True):
     """Read Minor Planet Center Orbit Database
-    File contains published orbital elements for all numbered and unnumbered 
+    File contains published orbital elements for all numbered and unnumbered
     multi-opposition minor planets.
     Get the file at:
-    https://www.minorplanetcenter.net/iau/MPCORB.html    
+    https://www.minorplanetcenter.net/iau/MPCORB.html
     See documentation at:
     https://minorplanetcenter.net/iau/info/MPOrbitFormat.html
-    
+
     Parameters
     ----------
-    filename : str, opt
+    filename: str, opt
         The full path to the MPCORB catalog file.
+    header: bool, opt
+        Flag indicating whether this file contains the typical MPCORB header or not.
+        If True, then will skip the first 43 lines of the input file.
+
     Returns
     -------
     pandas.DataFrame
@@ -29,18 +91,52 @@ def read_mpcorb(filename='MPCORB.DAT', header=True):
         skiprows = 43
     else:
         skiprows = 0
-    names = ['mpcId', 'H', 'G', 'epoch', 'meanAnomaly', 'argPeri', 
-             'Omega', 'inc', 'e', 'meanDailymo','a','reference', 
-             '#Obs', '#Opp', 'yr_1st&last_Obs','r.m.s', 
-             'coarsePerts', 'precisePerts', 'computer', 
-              'name','lastObs']
+    names = ['mpcId', 'H', 'G', 'epoch', 'meanAnomaly', 'argPeri',
+             'Omega', 'inc', 'e', 'meanDailyMotion', 'a', 'reference',
+             'N_Obs', 'N_Opp', 'yr_1st&last_Obs', 'r.m.s',
+             'coarsePerts', 'precisePerts', 'computer',
+             'readableName', 'lastObs']
     colspecs = [(0,7),(8,13),(14,19),(20,25),(26,35),(37,46),
                 (48,57),(59,68),(70,79),(80,91),(92,103),(108,116),
-                (117,122),(123,126),(127,136),(137,141), 
+                (117,122),(123,126),(127,136),(137,141),
                 (142, 145),(146,149),(150,160),(166,194),(194,202)]
     mpc = pd.read_fwf(filename, names=names, skiprows=skiprows, colspecs=colspecs, index=False)
-    mpc = mpc.apply(_convert_designation, axis=1)
+    mpc['numberId'] = np.zeros(len(mpc), int) - 999
+    mpc['Name'] = np.empty(len(mpc), str)
+    mpc['Desig'] = np.empty(len(mpc), str)
+    mpc = mpc.apply(_parse_mpc_names, axis=1)
     return mpc
+
+
+def read_astorb(filename='astorb.dat'):
+    """Read ASTORB data file.
+    ASTORB available from:
+    ftp://ftp.lowell.edu/pub/elgb/astorb.html
+    ASTORB is made available by Dr. Edward Bowell.
+    ASTORB is made possible by funding from NASA grant NAG5-4741 and the Lowell Observatory Endowment.
+    This provides updated osculating element orbits, and an estimate of their ephemeris uncertainty.
+    To get the updated ephemeris uncertainty, it makes sense to update this input data frequently.
+    Parameters
+    ----------
+    filename : str, opt
+        The full path to the MOC catalog file.
+    Returns
+    -------
+    pandas.DataFrame
+    """
+    names=['numberId', 'Name', 'computer', 'H', 'G1', 'B-V',
+           'diameter_IRAS_km', 'classification_IRAS',
+           'planet_crossing', 'orbit_comp', 'survey', 'mpc_crit', 'lowell_obs', 'rank',
+           'obsArc', '#Obs', 'epoch', 'meanAnomaly', 'argPeri', 'Omega', 'inc', 'e', 'a',
+           'date_comp', 'ceu', 'deltaceu', 'ceudate',
+           'peumax', 'peumaxdate', 'peumax10', 'peumax10date', 'peumax2', 'peumax2date']
+    widths = [7, 19, 16, 6, 6, 5, 6, 5, 4, 4, 4, 4, 4, 4, 6, 6, 9, 11, 11, 11, 10, 11, 13,
+              9, 8, 8, 9, 8, 9, 8, 9, 8, 9]
+    astorb = pd.read_fwf(filename, index_col=False, names=names, widths=widths)
+    astorb['Desig'] = np.empty(len(astorb), str)
+    astorb = astorb.apply(_parse_astorb_names, axis=1)
+    astorb['numberId'] = astorb['numberId'].fillna(-999).astype(int)
+    return astorb
 
 
 def read_sdss_moc(filename='ADR4.dat'):
@@ -66,44 +162,16 @@ def read_sdss_moc(filename='ADR4.dat'):
            'time', 'ra', 'dec', 'l', 'b', 'phi',
            'vmu', 'vmuerr', 'vnu', 'vnuerr', 'vl', 'vb',
            'u', 'uerr', 'g', 'gerr', 'r', 'rerr', 'i', 'ierr', 'z', 'zerr',
-           'sdssa', 'aerr', 'V', 'B', 'idFlag', 'numberId', 'name',
+           'sdssa', 'aerr', 'V', 'B', 'idFlag', 'numberId', 'Name',
            'detectionCount', 'totalCount', 'sdss_flags',
            'calcRA', 'calcDec', 'calcAppMag', 'helioDistance', 'geoDistance', 'phase',
-           'catalogId', 'H', 'G1', 'obsArc', 'epoch', 'a', 'e', 'inc', 'Omega', 'argPeri', 
+           'catalogId', 'H', 'G1', 'obsArc', 'epoch', 'a', 'e', 'inc', 'Omega', 'argPeri',
            'meanAnomaly','elemCatalogId', 'aProper', 'eProper', 'siniProper' ]
     # a* color = 0.89 (g - r) + 0.45 (r - i) - 0.57
     moc = pd.read_table(filename, delim_whitespace=True, names=names, usecols=names)
+    moc['Desig'] = np.empty(len(moc), str)
+    moc = moc.apply(_parse_sdss_names, axis=1)
     return moc
-
-
-def read_astorb(filename='astorb.dat'):
-    """Read ASTORB data file.
-    ASTORB available from:
-    ftp://ftp.lowell.edu/pub/elgb/astorb.html
-    ASTORB is made available by Dr. Edward Bowell.
-    ASTORB is made possible by funding from NASA grant NAG5-4741 and the Lowell Observatory Endowment.
-    This provides updated osculating element orbits, and an estimate of their ephemeris uncertainty.
-    To get the updated ephemeris uncertainty, it makes sense to update this input data frequently.
-    Parameters
-    ----------
-    filename : str, opt
-        The full path to the MOC catalog file.
-    Returns
-    -------
-    pandas.DataFrame
-    """
-    names=['#', 'name', 'computer', 'H', 'G1', 'B-V',
-           'diameter_IRAS_km', 'classification_IRAS',
-           'planet_crossing', 'orbit_comp', 'survey', 'mpc_crit', 'lowell_obs', 'rank',
-           'obsArc', '#Obs', 'epoch', 'meanAnomaly', 'argPeri', 'Omega', 'inc', 'e', 'a',
-           'date_comp', 'ceu', 'deltaceu', 'ceudate',
-           'peumax', 'peumaxdate', 'peumax10', 'peumax10date', 'peumax2', 'peumax2date']
-    widths = [7, 19, 16, 6, 6, 5, 6, 5, 4, 4, 4, 4, 4, 4, 6, 6, 9, 11, 11, 11, 10, 11, 13,
-              9, 8, 8, 9, 8, 9, 8, 9, 8, 9]
-    astorb = pd.read_fwf(filename, index_col=False, names=names, widths=widths)
-    astorb = astorb.apply(_convert_designation, axis=1)
-    astorb['#'] = astorb['#'].fillna(0).astype(int)
-    return astorb
 
 
 # ASTDYS proper elements
@@ -127,14 +195,14 @@ def read_lcdb(filename='LC_SUM_PUB.TXT'):
     -------
     pandas.DataFrame
     """
-    names = ['#', 'new', 'name', 'Desig', 'family', 'Csource', 'class', 'Dsource', 
-         'Dflag', 'diameter','Hsource', 'H', 'Hband', 'Asource', 'Albedoflag',  
-         'albedo', 'Pflag', 'period', 'Pdescr','Ampflag', 'AmpMin', 'AmpMax', 
-         'U', 'notes', 'binary', 'priv' , 'pole', 'sparse', 'widefield']
-    colspecs = [(0, 7), (8, 9), (10, 40), (41, 61), (62, 70), (71, 72), (73, 78), 
-                (79, 80), (81, 82), (83, 92), (93, 94), (95, 100), (101, 102), 
-                (104, 105), (106, 107), (108, 114), (115, 116), (117, 130), (131, 146), 
-                (147, 148), (149, 153), (154, 158), (159, 161),(162, 167), (168, 171), 
+    names = ['numberId', 'new', 'Name', 'Desig', 'family', 'Csource', 'class', 'Dsource',
+            'Dflag', 'diameter','Hsource', 'H', 'Hband', 'Asource', 'Albedoflag',
+            'albedo', 'Pflag', 'period', 'Pdescr','Ampflag', 'AmpMin', 'AmpMax',
+            'U', 'notes', 'binary', 'priv' , 'pole', 'sparse', 'widefield']
+    colspecs = [(0, 7), (8, 9), (10, 40), (41, 61), (62, 70), (71, 72), (73, 78),
+                (79, 80), (81, 82), (83, 92), (93, 94), (95, 100), (101, 102),
+                (104, 105), (106, 107), (108, 114), (115, 116), (117, 130), (131, 146),
+                (147, 148), (149, 153), (154, 158), (159, 161),(162, 167), (168, 171),
                 (172, 175), (176, 179), (180, 182), (183, 184)]
     lcdata = pd.read_fwf(filename, index_col=False, skiprows=5, names=names, colspecs=colspecs)
     lcdata['Frequency'] = 1.0/lcdata.period
