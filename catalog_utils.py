@@ -1,57 +1,75 @@
 import numpy as np
 import pandas as pd
 from sbpy.data import Names, TargetNameParseError
+from astropy.time import Time
 
 __all__ = ['read_mpcorb', 'read_sdss_moc', 'read_astorb', 'read_lcdb']
 
 
-def _expand_name(sname):
-    try:
-        int(sname)
-    except ValueError:
-        if sname.startswith('C') or sname.startswith('P'):
-            sname = sname[0:6] + '_' + sname[6:]
-        else:
-            year = sname[0:4]
-            letters = sname[4:6]
-            numbers = int(sname[6:])
-            if numbers > 0:
-                sname = '%s_%s%d' % (year, letters, numbers)
-            else:
-                sname = '%s_%s' % (year, letters)
-    return sname
-
-
-def _parse_mpc_names(x):
+def _parse_mpc_names_and_epochs(x):
     namedict = _parse_name(x.readableName)
     if namedict is None:
-        x.numberId = x.mpcId
+        try:
+            x.numberId = int(x.mpcId)
+        except ValueError:
+            x.numberId = -999
         x.Name = x.readableName
         x.Desig = x.readableName
     else:
-        x.numberId = namedict['number']
+        x.numberId = int(namedict['number'])
         x.Name = namedict['name']
         x.Desig = namedict['desig']
+    if x.numberId >= 0:
+        x.objId = x.numberId
+    else:
+        x.objId = x.Desig
+    try:
+        x.epoch = _unpack_mpc_date(x.epoch)
+    except:
+        print(x.epoch)
     return x
 
 
-def _parse_astorb_names(x):
+def _parse_astorb_names_and_epochs(x):
+    if x.numberId >= 0:
+        x.objId = x.numberId
+    else:
+        x.objId = x.Name
     namedict = _parse_name(x.Name)
     if namedict is None:
         x.Desig = x.Name
     else:
         x.Desig = namedict['desig']
+    try:
+        x.epoch = _convert_astorb_date(x.epoch)
+    except:
+        print(x.epoch)
     return x
 
 
 def _parse_sdss_names(x):
     x.Name = x.Name.replace('_', ' ')
-    namedict = Names._parse_name(x.Name)
+    namedict = _parse_name(x.Name)
     if namedict is None:
         x.Desig = x.Name
     else:
         x.Desig = namedict['desig']
+    if x.numberId >= 0:
+        x.objId = x.numberId
+    else:
+        x.objId = x.Name
     return x
+
+def _parse_lcdb_names(x):
+    namedict = _parse_name(x.Desig)
+    if namedict is not None:
+        x.Desig = namedict['desig']
+    if x.numberId >= 0:
+        x.objId = x.numberId
+    else:
+        x.objId = x.Name
+    return x
+
 
 def _parse_name(s):
     try:
@@ -64,6 +82,42 @@ def _parse_name(s):
         print(s)
         namedict = None
     return namedict
+
+def _mpc_lookup(x):
+    # Convert the single character dates into integers.
+    try:
+        x = int(x)
+    except ValueError:
+        x = ord(x) - 55
+    if x < 0 or x > 31:
+        raise ValueError
+    return x
+
+def _unpack_mpc_date(packed_date):
+    # See https://minorplanetcenter.net/iau/info/PackedDates.html
+    # for MPC documentation on packed dates.
+    # Examples:
+    #    1998 Jan. 18.73     = J981I73
+    #    2001 Oct. 22.138303 = K01AM138303
+    packed_date = str(packed_date)
+    year = _mpc_lookup(packed_date[0]) * 100 + int(packed_date[1:2])
+    # Month is encoded in third column.
+    month = _mpc_lookup(packed_date[3])
+    day = _mpc_lookup(packed_date[4])
+    if len(packed_date) > 5:
+        fractional_day = packed_date[5:]
+    isot_string = '%d-%02d-%02d' % (year, month, day)
+    t = Time(isot_string, format='isot', scale='tt')
+    return t.mjd
+
+def _convert_astorb_date(date):
+    date = str(date)
+    year = int(date[0:4])
+    month = int(date[5:6])
+    day = int(date[6:8])
+    isot_string = '%d-%02d-%02d' % (year, month, day)
+    t = Time(isot_string, format='isot', scale='tt')
+    return t.mjd
 
 
 def read_mpcorb(filename='MPCORB.DAT', header=True):
@@ -104,7 +158,8 @@ def read_mpcorb(filename='MPCORB.DAT', header=True):
     mpc['numberId'] = np.zeros(len(mpc), int) - 999
     mpc['Name'] = np.empty(len(mpc), str)
     mpc['Desig'] = np.empty(len(mpc), str)
-    mpc = mpc.apply(_parse_mpc_names, axis=1)
+    mpc['objId'] = np.empty(len(mpc), str)
+    mpc = mpc.apply(_parse_mpc_names_and_epochs, axis=1)
     return mpc
 
 
@@ -133,9 +188,10 @@ def read_astorb(filename='astorb.dat'):
     widths = [7, 19, 16, 6, 6, 5, 6, 5, 4, 4, 4, 4, 4, 4, 6, 6, 9, 11, 11, 11, 10, 11, 13,
               9, 8, 8, 9, 8, 9, 8, 9, 8, 9]
     astorb = pd.read_fwf(filename, index_col=False, names=names, widths=widths)
-    astorb['Desig'] = np.empty(len(astorb), str)
-    astorb = astorb.apply(_parse_astorb_names, axis=1)
     astorb['numberId'] = astorb['numberId'].fillna(-999).astype(int)
+    astorb['Desig'] = np.empty(len(astorb), str)
+    astorb['objId'] = np.empty(len(astorb), str)
+    astorb = astorb.apply(_parse_astorb_names_and_epochs, axis=1)
     return astorb
 
 
@@ -170,6 +226,7 @@ def read_sdss_moc(filename='ADR4.dat'):
     # a* color = 0.89 (g - r) + 0.45 (r - i) - 0.57
     moc = pd.read_table(filename, delim_whitespace=True, names=names, usecols=names)
     moc['Desig'] = np.empty(len(moc), str)
+    moc['objId'] = np.empty(len(moc), str)
     moc = moc.apply(_parse_sdss_names, axis=1)
     return moc
 
@@ -216,4 +273,6 @@ def read_lcdb(filename='LC_SUM_PUB.TXT'):
     tmp = lcdata.widefield.values
     tmp = np.where(tmp == 'Y', 1, 0)
     lcdata.widefield = tmp
+    lcdata['objId'] = np.empty(len(lcdata), str)
+    lcdata = lcdata.apply(_parse_lcdb_names, axis=1)
     return lcdata
