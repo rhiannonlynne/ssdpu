@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sbpy.data import Names, TargetNameParseError
+#from sbpy.data import Names, TargetNameParseError
 from astropy.time import Time
 
 __all__ = ['read_mpcorb', 'read_sdss_moc', 'read_astorb', 'read_lcdb']
@@ -71,6 +71,7 @@ def _parse_lcdb_names(x):
     return x
 
 
+"""
 def _parse_name(s):
     try:
         namedict = Names.parse_asteroid(s)
@@ -82,6 +83,9 @@ def _parse_name(s):
         print(s)
         namedict = None
     return namedict
+"""
+def _parse_name(s):
+    return None
 
 def _mpc_lookup(x):
     # Convert the single character dates into integers.
